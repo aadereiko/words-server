@@ -1,8 +1,9 @@
+import { IUser } from './user.types';
 import { Schema } from "mongoose";
 import { findByAge, findByCredentials } from "./user.statics";
 import { sameLastName, generateAuthToken } from "./user.methods";
 
-const UserSchema = new Schema({
+const UserSchema = new Schema<IUser>({
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, unique: true },
