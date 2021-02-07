@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { IUser } from './user.types';
 import { Schema } from "mongoose";
 import { findByAge, findByCredentials } from "./user.statics";
