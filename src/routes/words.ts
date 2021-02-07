@@ -1,9 +1,8 @@
+import { WordSetModel } from './../models/wordSet/wordSet.model';
 import { authMiddleware, IReqAuthMiddleware } from './../middlewares/auth';
 import { WordModel } from './../models/word/word.model';
 import { generateResponse } from './../general/helpers/request';
 import express, { Request, Response } from 'express';
-import { WordSetModel } from '../models/wordSet/wordSet.model';
-import { wordSetsRouter } from './wordSets';
 
 const router = express.Router();
 
@@ -25,7 +24,11 @@ router.post('/words', authMiddleware, async (req: Request, res: Response) => {
             return res.status(403).send(generateResponse(null, "You have no rights to add words to this set"));
         }
 
-        const newWord = new WordModel(req.body);
+        const newWord = new WordModel({
+            ...restReqBody,
+            setIds: [setId],
+        });
+
         await newWord.save();
 
         return res.status(201).send(generateResponse(newWord, null, "Word has been added"));
@@ -54,20 +57,17 @@ router.get('/words/:setId', authMiddleware, async (req: Request, res: Response) 
         const userId = (req as IReqAuthMiddleware).user._id;
 
         if (userId) {
-            const setToAddWord = await WordSetModel.findById(setId);
+            const wordSet = await WordSetModel.findById(setId);
 
-            if (!setToAddWord) {
+            if (!wordSet) {
                 return res.status(404).send(generateResponse(null, "Word set is not found"));
             }
 
-            if (String(setToAddWord.owner) !== String(userId)) {
+            if (String(wordSet.owner) !== String(userId)) {
                 return res.status(403).send(generateResponse(null, "You have no rights to watch the words of this set"));
             }
 
-            const words = await setToAddWord.populate('words').execPopulate();
-
-            console.log(words);
-
+            const words = await wordSet.populate('words').execPopulate();
             return res.send(generateResponse(words))
         }
     } catch (e) {
@@ -83,21 +83,9 @@ router.delete('/words/:id', authMiddleware, async (req: Request, res: Response) 
             return res.status(400).send(generateResponse(null, "Set id is not provided"));
         }
 
-
         const wordToDelete = await WordModel.findById(wordId);
         if (!wordToDelete) {
             return res.status(404).send(generateResponse(null, "Word is not found"));
-        }
-
-        const setOfWordToDelete = await WordSetModel.findById(wordToDelete.setId);
-        if (!setOfWordToDelete) {
-            return res.status(404).send(generateResponse(null, "Set is not found"));
-        }
-
-        const userId = (req as IReqAuthMiddleware).user._id;
-
-        if (!(String(userId) === String(setOfWordToDelete.owner))) {
-            return res.status(403).send(generateResponse(null, "You have no rights to remove this word"));
         }
 
         await wordToDelete.delete();
@@ -106,5 +94,95 @@ router.delete('/words/:id', authMiddleware, async (req: Request, res: Response) 
         res.status(500).send(generateResponse(null, e));
     }
 })
+
+router.patch('/words/:id/addToSet', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const wordId = req.params.id;
+        if (!wordId) {
+            return res.status(400).send(generateResponse(null, "A word id is not provided"));
+        }
+
+        const setId = req.body.setId;
+        if (!setId) {
+            return res.status(400).send(generateResponse(null, "A set id is not provided"));
+        }
+
+        const setToAdd = await WordSetModel.findById(setId);
+        if (!setToAdd) {
+            return res.status(404).send(generateResponse(null, "A set is not found"));
+        }
+
+        const userId = (req as IReqAuthMiddleware).user._id;
+
+        if (String(userId) !== String(setToAdd.owner)) {
+            return res.status(403).send(generateResponse(null, "You have no rights to update this set"));
+        }
+
+        const wordToBeAdded = await WordModel.findById(wordId);
+        if (!wordToBeAdded) {
+            return res.status(404).send(generateResponse(null, "A word is not found"));
+        }
+
+        if (!wordToBeAdded.setIds.includes(setId)) {
+            wordToBeAdded.setIds.push(setId);
+            await wordToBeAdded.save();
+        } else {
+            return res.status(400).send(generateResponse(null, "A word has been already added to a set"));
+        }
+
+        return res.send(generateResponse(wordToBeAdded, null, "A set added"));
+    } catch (e) {
+        res.status(500).send(generateResponse(null, e));
+    }
+})
+
+router.patch('/words/:wordId/removeSet', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const wordId = req.params.wordId;
+        if (!wordId) {
+            return res.status(400).send(generateResponse(null, "A word id is not provided"));
+        }
+
+        const setId = req.body.setId;
+        if (!setId) {
+            return res.status(400).send(generateResponse(null, "A set id is not provided"));
+        }
+
+        const setToRemove = await WordSetModel.findById(setId);
+        if (!setToRemove) {
+            return res.status(404).send(generateResponse(null, "A set is not found"));
+        }
+
+        const userId = (req as IReqAuthMiddleware).user._id;
+
+        if (String(userId) !== String(setToRemove.owner)) {
+            return res.status(403).send(generateResponse(null, "You have no rights to update this set"));
+        }
+
+        const word = await WordModel.findById(wordId);
+        if (!word) {
+            return res.status(404).send(generateResponse(null, "A word is not found"));
+        }
+
+        if (word.setIds.includes(setId)) {
+            word.setIds = word.setIds.filter(id => String(setId) !== String(id));
+
+            if (!word.setIds.length) {
+                await word.delete();
+
+                return res.send(generateResponse(null, "A word has been removed at all"));
+            }
+
+            await word.save();
+        } else {
+            return res.status(400).send(generateResponse(null, "A set didn't have this word"));
+        }
+
+        return res.send(generateResponse(word, null, "A set removed"));
+    } catch (e) {
+        res.status(500).send(generateResponse(null, e));
+    }
+})
+
 
 export { router as wordsRouter };

@@ -5,7 +5,7 @@ import { Document, Model } from "mongoose";
 export interface IWord {
     eng?: string;
     rus?: string;
-    setId: IWordSetDocument["_id"];
+    setIds: Array<IWordSetDocument["_id"]>;
 
     createdAt: Date;
     updatedAt: Date;

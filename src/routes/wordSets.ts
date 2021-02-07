@@ -1,7 +1,7 @@
+import { generateResponse } from './../general/helpers/request';
 import { authMiddleware, IReqAuthMiddleware } from './../middlewares/auth';
 import { WordSetModel } from './../models/wordSet/wordSet.model';
 import express, { Request, Response } from 'express';
-import { generateResponse } from '../general/helpers/request';
 
 const router = express.Router();
 
@@ -53,7 +53,7 @@ router.delete('/sets/:id', authMiddleware, async (req: Request, res: Response) =
     } catch (e) {
         res.status(500).send(generateResponse(null, e));
     }
-})
+});
 
 router.get('/sets/me', authMiddleware, async (req: Request, res: Response) => {
     try {
@@ -63,5 +63,47 @@ router.get('/sets/me', authMiddleware, async (req: Request, res: Response) => {
         res.status(500).send(generateResponse(null, e));
     }
 })
+
+router.patch('/sets/:id', authMiddleware, async (req: Request, res: Response) => {
+    const allowedFieldsToUpdate = ['lastRepetition'];
+
+    try {
+        const setId = req.params.id;
+
+        if (!setId) {
+            return res.status(400).send(generateResponse(null, "There is no set id"));
+        }
+
+        const foundSet = await WordSetModel.findById(setId);
+
+        if (!foundSet) {
+            return res.status(404).send(generateResponse(null, "Set is not found"));
+        }
+
+
+        const userId = (req as IReqAuthMiddleware).user._id;
+
+        if (String(userId) !== String(foundSet.owner)) {
+            return res.status(403).send(generateResponse(null, "You have no rights to remove this set"));
+        }
+
+        const newSetInfo = req.body;
+        const keysToUpdate = Object.keys(newSetInfo);
+
+        keysToUpdate.forEach(field => {
+            if (allowedFieldsToUpdate.includes(field)) {
+
+                // @ts-ignore
+                foundSet[field as string] = req.body[field];
+            }
+        });
+
+        await foundSet.save();
+        return res.status(200).send(generateResponse(foundSet, null, "Set was updated"));
+    } catch (e) {
+        res.status(500).send(generateResponse(null, e));
+    }
+})
+
 
 export { router as wordSetsRouter };
