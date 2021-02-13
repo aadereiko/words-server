@@ -80,7 +80,7 @@ router.delete('/words/:id', authMiddleware, async (req: Request, res: Response) 
         const wordId = req.params.id;
 
         if (!wordId) {
-            return res.status(400).send(generateResponse(null, "Set id is not provided"));
+            return res.status(400).send(generateResponse(null, "Word id is not provided"));
         }
 
         const wordToDelete = await WordModel.findById(wordId);
@@ -94,6 +94,50 @@ router.delete('/words/:id', authMiddleware, async (req: Request, res: Response) 
         res.status(500).send(generateResponse(null, e));
     }
 })
+
+router.patch('/words/:id', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const allowedFields = ['imgUrl', 'rus', 'eng'];
+        let isAllowedFields = true;
+        let dissallowdField = '';
+
+        Object.keys(req.body).forEach((field) => {
+            if (!allowedFields.includes(field)) {
+                isAllowedFields = false;
+                dissallowdField = field;
+            }
+        });
+
+        if (!isAllowedFields) {
+            return res.status(400).send(generateResponse(null, `${dissallowdField} isn't allowed to be changed`));
+        }
+
+        const wordId = req.params.id;
+
+        if (!wordId) {
+            return res.status(400).send(generateResponse(null, "Word id is not provided"));
+        }
+
+        const wordToUpdate = await WordModel.findById(wordId);
+        if (!wordToUpdate) {
+            return res.status(404).send(generateResponse(null, "Word is not found"));
+        }
+
+        Object.keys(req.body).forEach((field) => {
+            const value = req.body[field];
+            if (value) {
+                // @ts-ignore
+                wordToUpdate[field] = value;
+            }
+        });
+
+        await wordToUpdate.save();
+
+        return res.send(generateResponse(wordToUpdate, null, "A word successfully updated"));
+    } catch (e) {
+        return res.status(500).send(generateResponse(null, e));
+    }
+});
 
 router.patch('/words/:id/addToSet', authMiddleware, async (req: Request, res: Response) => {
     try {

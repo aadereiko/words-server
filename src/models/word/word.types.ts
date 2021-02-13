@@ -6,6 +6,7 @@ export interface IWord {
     eng?: string;
     rus?: string;
     setIds: Array<IWordSetDocument["_id"]>;
+    imgUrl?: string;
 
     createdAt: Date;
     updatedAt: Date;
