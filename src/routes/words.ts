@@ -1,3 +1,4 @@
+import { findLastDisallowedField } from './../general/helpers/validation';
 import { WordSetModel } from './../models/wordSet/wordSet.model';
 import { authMiddleware, IReqAuthMiddleware } from './../middlewares/auth';
 import { WordModel } from './../models/word/word.model';
@@ -98,18 +99,10 @@ router.delete('/words/:id', authMiddleware, async (req: Request, res: Response) 
 router.patch('/words/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
         const allowedFields = ['imgUrl', 'rus', 'eng'];
-        let isAllowedFields = true;
-        let dissallowdField = '';
+        const dissalowedField = findLastDisallowedField(req.body, allowedFields);
 
-        Object.keys(req.body).forEach((field) => {
-            if (!allowedFields.includes(field)) {
-                isAllowedFields = false;
-                dissallowdField = field;
-            }
-        });
-
-        if (!isAllowedFields) {
-            return res.status(400).send(generateResponse(null, `${dissallowdField} isn't allowed to be changed`));
+        if (dissalowedField) {
+            return res.status(400).send(generateResponse(null, `${dissalowedField} isn't allowed to be changed`));
         }
 
         const wordId = req.params.id;
